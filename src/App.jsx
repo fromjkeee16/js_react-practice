@@ -15,15 +15,23 @@ const categories = categoriesFromServer.map(category => ({
   owner: usersFromServer.find(user => user.id === category.ownerId),
 }));
 
-const products = productsFromServer.map(product => ({
-  ...product,
-  category: categories.find(category => category.id === product.categoryId),
-}));
+const products = productsFromServer.map(product => {
+  const category = categories.find(cat => cat.id === product.categoryId);
+  const user = usersFromServer.find(usr => usr.id === category.ownerId);
+
+  return { ...product, category, user };
+});
 
 const filterUsers = [...usersFromServer];
+const tableFields = [
+  { id: 1, name: 'ID' },
+  { id: 2, name: 'Product' },
+  { id: 3, name: 'Category' },
+  { id: 4, name: 'User' },
+];
 
-function prepareGoods(productList, query, selectedUserId, selectedCategoryId) {
-  let goods = [...productList];
+function filterGoods(goodsList, query, selectedUserId, selectedCategoryId) {
+  let goods = [...goodsList];
 
   if (query) {
     goods = goods.filter(good => good.name.toLowerCase().includes(query));
@@ -40,12 +48,73 @@ function prepareGoods(productList, query, selectedUserId, selectedCategoryId) {
   return goods;
 }
 
+function sortGoods(goodsList, field, reversed) {
+  const goods = [...goodsList];
+
+  if (field) {
+    goods.sort((good1, good2) => {
+      switch (field) {
+        case 'id':
+          return good1.id - good2.id;
+        case 'product':
+          return good1.name.localeCompare(good2.name);
+        case 'category': {
+          const cat1 = good1.category?.title || '';
+          const cat2 = good2.category?.title || '';
+          // return good1.category?.title?.localeCompare(good2.category?.title || '') doesnt work correctly
+
+          return cat1.localeCompare(cat2);
+        }
+
+        case 'user': {
+          const usr1 = good1.user?.name || '';
+          const usr2 = good2.user?.name || '';
+
+          return usr1.localeCompare(usr2);
+        }
+
+        default:
+          return 0;
+      }
+    });
+  }
+
+  if (reversed) {
+    goods.reverse();
+  }
+
+  return goods;
+}
+
+function prepareGoods(
+  productList,
+  query,
+  selectedUserId,
+  selectedCategoryId,
+  field,
+  reversed,
+) {
+  const filteredGoods = filterGoods(
+    productList,
+    query,
+    selectedUserId,
+    selectedCategoryId,
+  );
+
+  const sortedGoods = sortGoods(filteredGoods, field, reversed);
+
+  return sortedGoods;
+}
+
 export const App = () => {
-  const [selectedUserId, setSelectedUserId] = useState(FILTER_USERS_ALL_NAME);
   const [query, setQuery] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState(FILTER_USERS_ALL_NAME);
   const [selectedCategoryId, setSelectedCategoryId] = useState(
     FILTER_CATEGORIES_ALL_NAME,
   );
+  const [sortBy, setSortBy] = useState('');
+  const [reversed, setReversed] = useState(false);
+
   const sanitizedQuery = query.trim().toLowerCase();
 
   const visibleProducts = prepareGoods(
@@ -53,6 +122,8 @@ export const App = () => {
     sanitizedQuery,
     selectedUserId,
     selectedCategoryId,
+    sortBy,
+    reversed,
   );
 
   const handleUserSelect = user => {
@@ -77,8 +148,31 @@ export const App = () => {
     handleSearchClear();
   };
 
+  const handleSortField = field => {
+    if (sortBy !== field) {
+      setSortBy(field);
+      setReversed(false);
+
+      return;
+    }
+
+    if (!reversed) {
+      setReversed(true);
+
+      return;
+    }
+
+    setSortBy('');
+    setReversed(false);
+  };
+
   return (
     <div className="section">
+      <div className="is-info">
+        &apos;{String(reversed)}&apos;
+        <hr />
+        &apos;{sortBy}&apos;
+      </div>
       <div className="container">
         <h1 className="title">Product Categories</h1>
 
@@ -191,49 +285,33 @@ export const App = () => {
             >
               <thead>
                 <tr>
-                  <th>
-                    <span className="is-flex is-flex-wrap-nowrap">
-                      ID
-                      <a href="#/">
-                        <span className="icon">
-                          <i data-cy="SortIcon" className="fas fa-sort" />
-                        </span>
-                      </a>
-                    </span>
-                  </th>
+                  {tableFields.map(field => {
+                    const fieldName = field.name.toLowerCase();
+                    const isSelected = fieldName === sortBy;
 
-                  <th>
-                    <span className="is-flex is-flex-wrap-nowrap">
-                      Product
-                      <a href="#/">
-                        <span className="icon">
-                          <i data-cy="SortIcon" className="fas fa-sort-down" />
+                    return (
+                      <th key={field.id}>
+                        <span className="is-flex is-flex-wrap-nowrap">
+                          {field.name}
+                          <a
+                            href="#/"
+                            onClick={() => handleSortField(fieldName)}
+                          >
+                            <span className="icon">
+                              <i
+                                data-cy="SortIcon"
+                                className={classNames('fas', {
+                                  'fa-sort': !isSelected,
+                                  'fa-sort-up': isSelected && !reversed,
+                                  'fa-sort-down': isSelected && reversed,
+                                })}
+                              />
+                            </span>
+                          </a>
                         </span>
-                      </a>
-                    </span>
-                  </th>
-
-                  <th>
-                    <span className="is-flex is-flex-wrap-nowrap">
-                      Category
-                      <a href="#/">
-                        <span className="icon">
-                          <i data-cy="SortIcon" className="fas fa-sort-up" />
-                        </span>
-                      </a>
-                    </span>
-                  </th>
-
-                  <th>
-                    <span className="is-flex is-flex-wrap-nowrap">
-                      User
-                      <a href="#/">
-                        <span className="icon">
-                          <i data-cy="SortIcon" className="fas fa-sort" />
-                        </span>
-                      </a>
-                    </span>
-                  </th>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
 
@@ -252,12 +330,12 @@ export const App = () => {
                     <td
                       data-cy="ProductUser"
                       className={
-                        product.category.owner.sex === 'm'
+                        product.user.sex === 'm'
                           ? 'has-text-link'
                           : 'has-text-danger'
                       }
                     >
-                      {product.category.owner.name}
+                      {product.user.name}
                     </td>
                   </tr>
                 ))}
