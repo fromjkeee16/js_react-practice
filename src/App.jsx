@@ -8,7 +8,6 @@ import categoriesFromServer from './api/categories';
 import productsFromServer from './api/products';
 
 const FILTER_USERS_ALL_NAME = 'all';
-const FILTER_CATEGORIES_ALL_NAME = 'all';
 
 const categories = categoriesFromServer.map(category => ({
   ...category,
@@ -30,6 +29,7 @@ const tableFields = [
   { id: 4, name: 'User' },
 ];
 
+// task 5 - selectedCategoryId = change int -> []
 function filterGoods(goodsList, query, selectedUserId, selectedCategoryId) {
   let goods = [...goodsList];
 
@@ -41,8 +41,8 @@ function filterGoods(goodsList, query, selectedUserId, selectedCategoryId) {
     goods = goods.filter(good => good.category.owner.id === selectedUserId);
   }
 
-  if (selectedCategoryId !== FILTER_CATEGORIES_ALL_NAME) {
-    goods = goods.filter(good => good.category.id === selectedCategoryId);
+  if (selectedCategoryId.length > 0) {
+    goods = goods.filter(good => selectedCategoryId.includes(good.category.id));
   }
 
   return goods;
@@ -109,9 +109,7 @@ function prepareGoods(
 export const App = () => {
   const [query, setQuery] = useState('');
   const [selectedUserId, setSelectedUserId] = useState(FILTER_USERS_ALL_NAME);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(
-    FILTER_CATEGORIES_ALL_NAME,
-  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState([]);
   const [sortBy, setSortBy] = useState('');
   const [reversed, setReversed] = useState(false);
 
@@ -131,7 +129,17 @@ export const App = () => {
   };
 
   const handleCategorySelect = category => {
-    setSelectedCategoryId(category);
+    setSelectedCategoryId(prev => {
+      if (!prev.includes(category)) {
+        return [...prev, category];
+      }
+
+      return prev.toSpliced(prev.indexOf(category), 1);
+    });
+  };
+
+  const handleCategoryClear = () => {
+    setSelectedCategoryId([]);
   };
 
   const handleSearchChange = event => {
@@ -143,7 +151,7 @@ export const App = () => {
   };
 
   const handleFiltersClear = () => {
-    handleCategorySelect(FILTER_CATEGORIES_ALL_NAME);
+    handleCategoryClear();
     handleUserSelect(FILTER_USERS_ALL_NAME);
     handleSearchClear();
   };
@@ -168,11 +176,6 @@ export const App = () => {
 
   return (
     <div className="section">
-      <div className="is-info">
-        &apos;{String(reversed)}&apos;
-        <hr />
-        &apos;{sortBy}&apos;
-      </div>
       <div className="container">
         <h1 className="title">Product Categories</h1>
 
@@ -241,10 +244,9 @@ export const App = () => {
                 href="#/"
                 data-cy="AllCategories"
                 className={classNames('button', 'is-success', 'mr-6', {
-                  'is-outlined':
-                    selectedCategoryId !== FILTER_CATEGORIES_ALL_NAME,
+                  'is-outlined': selectedCategoryId.length,
                 })}
-                onClick={() => handleCategorySelect(FILTER_CATEGORIES_ALL_NAME)}
+                onClick={handleCategoryClear}
               >
                 All
               </a>
@@ -254,7 +256,7 @@ export const App = () => {
                   key={category.id}
                   data-cy="Category"
                   className={classNames('button', 'mr-2', 'my-1', {
-                    'is-info': selectedCategoryId === category.id,
+                    'is-info': selectedCategoryId.includes(category.id),
                   })}
                   href="#/"
                   onClick={() => handleCategorySelect(category.id)}
